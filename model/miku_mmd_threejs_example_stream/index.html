@@ -83,6 +83,7 @@ var camZ_max = 1000;
 var camZ_min = 100;
 var segmentNumber = 60;
 var camera_size = null;
+var uvc_blender = false;
 var show_stats = false;
 var canvas_size = null;
 function init() {
@@ -90,6 +91,9 @@ function init() {
    var url_vars =  getUrlVars();
    if (url_vars["cm"]) {
      camera_size = parseInt(url_vars["cm"]);
+   }
+   if ("ub" in url_vars) {
+     uvc_blender = true;
    }
    if ("st" in url_vars) {
      show_stats = true;
@@ -179,7 +183,7 @@ function init() {
   var is_ff = navigator.mozGetUserMedia;
   video = document.createElement('video');
   var camera_height = camera_size || 1080;
-  var camera_width = (camera_size || 1080) * 1920 / 1080;
+  var camera_width = uvc_blender ? camera_height*2 : (camera_size || 1080) * 1920 / 1080;
   navigator.getMedia( {"video": is_ff ? { height: { ideal: camera_height } } : {mandatory: { minWidth: camera_width, maxWidth: camera_width, minHeight: camera_height, maxHeight: camera_height }}, "audio":true}, function(stream){
           video.src = URL.createObjectURL(stream);
           window.localStream = stream;
@@ -264,7 +268,7 @@ function animate() {
             console.log("video-width: " + width + ", video-height: " + height);
             var equi_height = width/2 - 2;
             videoImage.width = width;
-            videoImage.height = equi_height;
+            videoImage.height = uvc_blender ? height : equi_height;
             videoImageContext = videoImage.getContext('2d');
             videoImageContext.fillRect(0, 0, width, height);
             isVideoInitialized = true;
