@@ -1,0 +1,138 @@
+<html>
+<meta charset="utf-8">
+	<style>
+		html, body { height:100%; overflow:hidden; }
+		body { margin:0; }
+		#snapshot { position: absolute; top: 0px; left: 0px; }
+		#video { visibility: hidden; }
+	</style>
+<body>
+<script src="jquery.min.js"></script>
+<script src="three.min.js"></script>
+<script src="OrbitControls.js"></script>
+<script>
+
+$(init);
+
+var camZ = 0;
+var camZ_max = 1000;
+var camZ_min = 100;
+var segmentNumber = 60;
+function init() {
+    scene = new THREE.Scene();
+
+    clock = new THREE.Clock();
+	var width = $(window).width();
+    var height = $(window).height();
+
+    // カメラ
+    camera = new THREE.PerspectiveCamera( 70, width / height);
+	camera.position.x = 50;
+	camera.position.y = 20;
+    camera.position.z = 80;
+    scene.add( camera );
+
+
+    //ライティング
+    var directionalLight = new THREE.DirectionalLight( 0xffffff, 0.2 ); //照明1
+    directionalLight.position.set(0,0,-300);
+	scene.add( directionalLight );
+	directionalLight = new THREE.DirectionalLight( 0xffffff, 0.5 ); //照明2
+    directionalLight.position.set(-200,250,200);
+	directionalLight.castShadow = true; //影を落とす光にする
+	directionalLight.shadowMapWidth = 2048; //影のマッピング細かさ
+	directionalLight.shadowMapHeight = 2048; //影のマッピング細かさ
+	directionalLight.shadowDarkness = 0.1; //影の濃さ
+    scene.add( directionalLight );
+    scene.add(new THREE.AmbientLight(0xaaaaaa)); //環境光
+
+    //オブジェクト
+    loader = new THREE.JSONLoader();
+    loader.load( 'miku.json', function ( geometry, materials ) { //第１引数はジオメトリー、第２引数はマテリアルが自動的に取得）
+			materials.forEach(function(mat) {
+            mat.skinning = true;
+						mat.side = THREE.DoubleSide;
+        });
+        var faceMaterial = new THREE.MeshFaceMaterial( materials );
+        json = new THREE.SkinnedMesh( geometry, faceMaterial );
+        json.position.set( 8, -97, -8); //オブジェクトの位置
+		var scale = 28; //オブジェクトの大きさ
+        json.scale.set( scale, scale, scale );
+		json.overdraw = true;
+		json.castShadow = true; //影を作るオブジェクト対象(castだけでは自身に影はつかない)
+		scene.add( json );
+
+		//アニメーション
+        if (json.geometry.animations) {
+		    THREE.AnimationHandler.add( json.geometry.animations[ 0 ] );
+		    action = new THREE.Animation(json,
+			    json.geometry.animations[ 0 ].name,
+				THREE.AnimationHandler.CATMULLROM);
+			setTimeout(function() {
+			  action.play();
+			  $("#audio").get(0).play();
+			  animateCurrnetTime = 0;
+			  animate();
+			  }, 300);
+			animation_length = json.geometry.animations[ 0 ].length;
+		}
+
+
+    });
+
+	//背景
+	video = document.createElement('video');
+	video.src = "hato.mp4";
+	video.load();
+	video.play();
+	videoImage = document.createElement('canvas');
+	videoImage.width = 1280;
+	videoImage.height = 640;
+    videoImageContext = videoImage.getContext('2d');
+    videoImageContext.fillStyle = '#000000';
+    videoImageContext.fillRect(0, 0, videoImage.width, videoImage.height);
+    tex = new THREE.Texture(videoImage);
+	tex.minFilter = tex.magFilter = THREE.LinearFilter;
+    //モデルを考慮して空間半径を決めないといけない→モデル側を変えるといい。
+    var sphereGeometry = new THREE.SphereGeometry( 100, segmentNumber, segmentNumber);
+    var matrix = new THREE.Matrix4().makeScale(1, 1, -1);
+    sphereGeometry.applyMatrix(matrix);
+    sphereGeometry.applyMatrix(new THREE.Matrix4().makeRotationY(90 * Math.PI/180.0));
+    var mesh = new THREE.Mesh(sphereGeometry , new THREE.MeshBasicMaterial( { map: tex, overdraw: true} ) );
+	mesh.receiveShadow = true; //影を受けるオブジェクト対象(receiveだけでは自身は影を作らない)
+    scene.add( mesh );
+
+
+    //レンダラー
+    renderer = new THREE.WebGLRenderer({antialias: true});
+    renderer.setSize( width, height );
+	renderer.shadowMapEnabled = true;
+    document.body.appendChild( renderer.domElement );
+
+    //マウスコントローラ
+    control = new THREE.OrbitControls( camera, renderer.domElement ); // 表示領域をコントロール
+    control.noPan = true; // 右ドラッグ(平行視点移動禁止)
+}
+
+var animateCurrnetTime = 0;
+function animate() {
+    requestAnimationFrame( animate );
+	var delta = clock.getDelta();
+	animateCurrnetTime += delta;
+	THREE.AnimationHandler.update(delta);
+    renderer.render( scene, camera );
+    control.update();   //これ追加
+	if (video.readyState === video.HAVE_ENOUGH_DATA) {
+	video.play();
+        videoImageContext.drawImage(video, 0, 0);
+        tex.needsUpdate = true;
+    }
+	if (animateCurrnetTime >= animation_length) {
+		animateCurrnetTime = 0;
+		document.getElementById("audio").currentTime = 0;
+	}
+}
+</script>
+<audio id="audio" src="gobas.m4a"></audio>
+</body>
+</html>

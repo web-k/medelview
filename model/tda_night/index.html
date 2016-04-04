@@ -1,0 +1,466 @@
+<html>
+<meta charset="utf-8">
+	<style>
+		html, body { height:100%; overflow:hidden; }
+		body { margin:0; }
+		#snapshot { position: absolute; top: 0px; left: 0px; }
+		#dd {
+			height: 30px;
+			width: 75px;
+			position: absolute;
+			top: 0px;
+			left: 0px;
+			border: 1px dashed;
+			border-radius: 5px;
+			text-align: center;
+			color: #404040;
+			background-color: rgba(255, 255, 255, 0.3);
+			font: 11px "Lucida Grande", sans-serif;
+		}
+	</style>
+<body>
+<script src="jquery.min.js"></script>
+<script src="dat.gui.js"></script>
+<script src="three.min.js"></script>
+<script src="OrbitControls.js"></script>
+<script src="Stats.js"></script>
+<script>
+
+$(init);
+
+var SceneParams = function() {
+  // Camera
+  this.cameraFov = 65;
+	this.cameraX = -60;
+  this.cameraY = 40;
+  this.cameraZ = 190;
+  // Light
+  this.lightIntensity = 0;
+  this.lightX = 0;
+  this.lightY = 0;
+  this.lightZ = 300;
+  this.lightColor = "#ffffff";
+  this.lightCastShadow = false;
+  this.lightShadowDarkness = 0.1;
+  // Light2
+  this.light2Intensity = 0;
+  this.light2X = 0;
+  this.light2Y = 0;
+  this.light2Z = -300;
+  this.light2Color = "#ffffff";
+  this.light2CastShadow = false;
+  this.light2ShadowDarkness = 0.1;
+  // Light3
+  this.light3Intensity = 1.4;
+  this.light3X = 111;
+  this.light3Y = 71;
+  this.light3Z = 38;
+  this.light3Color = "#7da2ff";
+  this.light3CastShadow = true;
+  this.light3ShadowDarkness = 0.42;
+  // AmbientLight
+  this.ambientLightColor = "#666666";
+  // Object
+  this.objectShow = true;
+  this.objectX = 8.0;
+  this.objectY = -190.0;
+  this.objectZ = -8.0;
+  this.objectScale = 65;
+  // Effect
+  this.effectEnable = false;
+  // Sphere
+  this.sphereRotation = -50;
+  this.sphereData = null;
+  // Model
+  this.modelName = 'miku';
+};
+var Methods = function () {
+  // Operation
+  this.stop = function () {
+    action.stop();
+    animateCurrnetTime = 0;
+    $audio.get(0).pause();
+  };
+  this.start = function () {
+    action.stop();
+    animateCurrnetTime = 0;
+    $audio.get(0).load();
+    action.play();
+    $audio.get(0).play();
+  };
+  // LocalStorage
+  this.reset_and_reload = function() {
+    localStorage.removeItem(window.location.href+':params');
+    location.reload();
+  };
+  this.save = function () {
+    var lssp = JSON.stringify(sp);
+    localStorage.setItem(window.location.href+':params', lssp);
+  };
+  this.save_and_reload = function () {
+    var lssp = JSON.stringify(sp);
+    localStorage.setItem(window.location.href+':params', lssp);
+    location.reload();
+  };
+}
+
+
+var camZ = 0;
+var camZ_max = 1000;
+var camZ_min = 100;
+var segmentNumber = 60;
+var sp;
+var json_model;
+var xSpeed, ySpeed;
+xSpeed = 0.001;
+ySpeed = 0.0001;
+var particles, material, particleCount, pointCloud, texture;
+var show_stats = false;
+var canvas_size = null;
+function init() {
+    // クエリチェック
+   var url_vars =  getUrlVars();
+   if ("st" in url_vars) {
+     show_stats = true;
+   }
+   if (url_vars["cv"]) {
+     canvas_size = parseInt(url_vars["cv"]);
+   }
+
+        var lssp = localStorage.getItem(window.location.href+':params');
+
+                // FPS表示
+                stats = new Stats();
+                var $stats = $(stats.domElement);
+                stats.setMode( 0 ); //fps
+                // align top-left
+                $stats.css({
+                        position: "absolute",
+                        left: "80px",
+                        top: 0
+                        });
+                if (show_stats) {
+                  $("body").append($stats);
+                }
+
+	// 各種パラメータ変更GUI
+        if (lssp) {
+          sp = JSON.parse(lssp);
+        } else {
+          sp = new SceneParams();
+        }
+        mt = new Methods();
+	var gui = new dat.GUI();
+	var cp = gui.addFolder('Camera');
+	cp.add(sp, 'cameraFov').min(0).max(180).onChange(function(value){ camera.fov = value; camera.updateProjectionMatrix(); });
+	cp.add(sp, 'cameraX').min(-300).max(300).step(0.5).onChange(function(value){ camera.position.x = value; });
+	cp.add(sp, 'cameraY').min(-300).max(300).step(0.5).onChange(function(value){ camera.position.y = value; });
+	cp.add(sp, 'cameraZ').min(-300).max(300).step(0.5).onChange(function(value){ camera.position.z = value; });
+	var l1p = gui.addFolder('Light1');
+	l1p.add(sp, 'lightIntensity').onChange(function(value){ light.intensity = value; });
+	l1p.add(sp, 'lightX').min(-300).max(300).step(0.5).onChange(function(value){ light.position.x = value; });
+	l1p.add(sp, 'lightY').min(-300).max(300).step(0.5).onChange(function(value){ light.position.y = value; });
+	l1p.add(sp, 'lightZ').min(-300).max(300).step(0.5).onChange(function(value){ light.position.z = value; });
+	l1p.addColor(sp, 'lightColor').onChange(function(value){
+            value=value.replace( '#','0x' );
+            light.color.setHex(value);
+        });
+	l1p.add(sp, 'lightCastShadow').onChange(function(value){ light.castShadow = value; });
+	l1p.add(sp, 'lightShadowDarkness').onChange(function(value){ light.shadowDarkness = value; });
+	var l2p = gui.addFolder('Light2');
+	l2p.add(sp, 'light2Intensity').onChange(function(value){ light2.intensity = value; });
+	l2p.add(sp, 'light2X').min(-300).max(300).step(0.5).onChange(function(value){ light2.position.x = value; });
+	l2p.add(sp, 'light2Y').min(-300).max(300).step(0.5).onChange(function(value){ light2.position.y = value; });
+	l2p.add(sp, 'light2Z').min(-300).max(300).step(0.5).onChange(function(value){ light2.position.z = value; });
+	l2p.addColor(sp, 'light2Color').onChange(function(value){
+            value=value.replace( '#','0x' );
+            light2.color.setHex(value);
+        });
+	l2p.add(sp, 'light2CastShadow').onChange(function(value){ light2.castShadow = value; });
+	l2p.add(sp, 'light2ShadowDarkness').onChange(function(value){ light2.shadowDarkness = value; });
+	var l3p = gui.addFolder('Light3');
+	l3p.add(sp, 'light3Intensity').onChange(function(value){ light3.intensity = value; });
+	l3p.add(sp, 'light3X').min(-300).max(300).step(0.5).onChange(function(value){ light3.position.x = value; });
+	l3p.add(sp, 'light3Y').min(-300).max(300).step(0.5).onChange(function(value){ light3.position.y = value; });
+	l3p.add(sp, 'light3Z').min(-300).max(300).step(0.5).onChange(function(value){ light3.position.z = value; });
+	l3p.addColor(sp, 'light3Color').onChange(function(value){
+            value=value.replace( '#','0x' );
+            light3.color.setHex(value);
+        });
+	l3p.add(sp, 'light3CastShadow').onChange(function(value){ light3.castShadow = value; });
+	l3p.add(sp, 'light3ShadowDarkness').onChange(function(value){ light3.shadowDarkness = value; });
+	var alp = gui.addFolder('AmbientLight');
+	alp.addColor(sp, 'ambientLightColor').onChange(function(value){
+            value=value.replace( '#','0x' );
+            ambientLight.color.setHex(value);
+        });
+        var ob = gui.addFolder('Object');
+        ob.add(sp, 'objectShow').onChange(function(value) {
+          if (value) {
+            scene.add( json_model );
+            action.stop();
+            animateCurrnetTime = 0;
+            $audio.get(0).load();
+            action.play();
+            $audio.get(0).play();
+          } else {
+            action.stop();
+            animateCurrnetTime = 0;
+            $audio.get(0).pause();
+            scene.remove( json_model );
+          }
+        });
+	ob.add(sp, 'objectX').min(-300).max(300).onChange(function(value){ json_model.position.x = value; });
+	ob.add(sp, 'objectY').min(-300).max(300).onChange(function(value){ json_model.position.y = value; });
+	ob.add(sp, 'objectZ').min(-300).max(300).onChange(function(value){ json_model.position.z = value; });
+	ob.add(sp, 'objectScale').min(0).max(300).onChange(function(value){ json_model.scale.set(value, value, value); });
+        var ef = gui.addFolder('Effect');
+        ef.add(sp, 'effectEnable').onChange(function(value) { value ? scene.add(pointCloud) : scene.remove(pointCloud); });
+        var sph = gui.addFolder('Sphere');
+	sph.add(sp, 'sphereRotation').min(-180).max(180).onChange(function(value){
+            mesh.rotation.y += (value-lastSphereRotation) * Math.PI/180.0;
+            lastSphereRotation = value;
+        });
+        var op = gui.addFolder('Operation');
+        op.add(mt, 'stop');
+        op.add(mt, 'start');
+        var ls = gui.addFolder('Local Storage');
+        ls.add(mt, 'reset_and_reload');
+        ls.add(mt, 'save');
+        ls.add(mt, 'save_and_reload');
+
+    scene = new THREE.Scene();
+
+    clock = new THREE.Clock();
+	var width = $(window).width();
+    var height = $(window).height();
+
+    // カメラ
+    camera = new THREE.PerspectiveCamera( sp.cameraFov, width / height);
+	camera.position.x = sp.cameraX;
+	camera.position.y = sp.cameraY;
+    camera.position.z = sp.cameraZ;
+    scene.add( camera );
+
+
+    //ライティング
+    light = new THREE.DirectionalLight( eval(sp.lightColor.replace('#','0x')), sp.lightIntensity );
+    light.position.set(sp.lightX,sp.lightY,sp.lightZ);
+	light.castShadow = sp.lightCastShadow; //影を落とす光にする
+	light.shadowMapWidth = 2048; //影のマッピング細かさ
+	light.shadowMapHeight = 2048; //影のマッピング細かさ
+	light.shadowDarkness = sp.lightShadowDarkness; //影の濃さ
+    scene.add( light );
+    light2 = new THREE.DirectionalLight( eval(sp.light2Color.replace('#','0x')), sp.light2Intensity );
+    light2.position.set(sp.light2X,sp.light2Y,sp.light2Z);
+	light2.castShadow = sp.light2CastShadow; //影を落とす光にする
+	light2.shadowMapWidth = 2048; //影のマッピング細かさ
+	light2.shadowMapHeight = 2048; //影のマッピング細かさ
+	light2.shadowDarkness = sp.light2ShadowDarkness; //影の濃さ
+	scene.add( light2 );
+	light3 = new THREE.DirectionalLight( eval(sp.light3Color.replace('#','0x')), sp.light3Intensity );
+    light3.position.set(sp.light3X,sp.light3Y,sp.light3Z);
+	light3.castShadow = sp.light3CastShadow; //影を落とす光にする
+	light3.shadowMapWidth = 2048; //影のマッピング細かさ
+	light3.shadowMapHeight = 2048; //影のマッピング細かさ
+	light3.shadowDarkness = sp.light3ShadowDarkness; //影の濃さ
+    scene.add( light3 );
+	ambientLight = new THREE.AmbientLight( eval(sp.ambientLightColor.replace('#','0x')) );
+    scene.add(ambientLight); //環境光
+
+    //オブジェクト
+    loader = new THREE.JSONLoader();
+    loader.load( sp.modelName + '.json', updateModel);
+
+	//背景
+      if (sp.sphereData) {
+        tex = new THREE.ImageUtils.loadTexture(sp.sphereData);
+      } else {
+        tex = new THREE.ImageUtils.loadTexture('equirectangular.jpg');
+      }
+	  tex.minFilter = tex.magFilter = THREE.LinearFilter;
+      //モデルを考慮して空間半径を決めないといけない→モデル側を変えるといい。
+      sphereGeometry = new THREE.SphereGeometry( 200, segmentNumber, segmentNumber);
+      var matrix = new THREE.Matrix4().makeScale(1, 1, -1);
+      sphereGeometry.applyMatrix(matrix);
+      lastSphereRotation = sp.sphereRotation;
+      var sphereRotationY = new THREE.Matrix4().makeRotationY((90+sp.sphereRotation) * Math.PI/180.0);
+      sphereGeometry.applyMatrix(sphereRotationY);
+      mesh = new THREE.Mesh(sphereGeometry , new THREE.MeshBasicMaterial( { map: tex, overdraw: true} ) );
+	  mesh.receiveShadow = true; //影を受けるオブジェクト対象(receiveだけでは自身は影を作らない)
+      scene.add( mesh );
+
+
+			// パーティクルの数
+		  particleCount = 2000;
+		  particles = new THREE.Geometry();
+
+		  // テクスチャの設定
+		  texture = THREE.ImageUtils.loadTexture("particles.png");
+
+		  // マテリアルの設定
+		  material = new THREE.ParticleBasicMaterial({
+		        color: 0xFFFFFF,
+		        size: 5,
+		        map: texture,
+		        transparent: true
+		  });
+
+		  // パーティクルの位置の設定
+		  for (var i = 0; i < particleCount; i++) {
+		    var px = Math.random() * 400 - 200,
+		        py = Math.random() * 400 - 200,
+		        pz = Math.random() * 400 - 200;
+		    particle = new THREE.Vector3( px, py, pz);
+
+		    // パーティクルのべロシティの設定
+		    particle.velocity = new THREE.Vector3( 0, -Math.random(), 0 );
+		    particles.vertices.push( particle );
+		  }
+
+		  pointCloud = new THREE.ParticleSystem( particles, material );
+
+		  // パーティクルの深さを毎フレームソート
+		  pointCloud.sortParticles = true;
+
+		  if (sp.effectEnable) { scene.add( pointCloud ); }
+
+
+    //レンダラー
+    renderer = new THREE.WebGLRenderer();//THREE.CanvasRenderer();でもいいけどポリゴンの裏が非表示？
+    var aspect = width/height;
+    var renderer_height = canvas_size || height;
+    renderer.setSize( renderer_height*aspect, renderer_height );
+    var renderer_element = renderer.domElement;
+    renderer_element.style.width = width + "px";
+    renderer_element.style.height = height + "px";
+    renderer.shadowMapEnabled = true;
+    renderer.shadowMapEnabled = true;
+    renderer.antialias = true;
+    document.body.appendChild( renderer.domElement );
+
+    //マウスコントローラ
+    control = new THREE.OrbitControls( camera, renderer.domElement ); // 表示領域をコントロール
+    control.noPan = true; // 右ドラッグ(平行視点移動禁止)
+}
+
+function updateModel ( geometry, materials ) { //第１引数はジオメトリー、第２引数はマテリアルが自動的に取得）
+
+    if (json_model != null){
+        scene.remove( json_model );
+        json_model.geometry.dispose();
+    }
+
+    materials.forEach(function(mat) {
+        mat.skinning = true;
+    });
+    var faceMaterial = new THREE.MeshFaceMaterial( materials );
+    json_model = new THREE.SkinnedMesh( geometry, faceMaterial );
+    json_model.position.set( sp.objectX, sp.objectY, sp.objectZ); //オブジェクトの位置
+    var scale = sp.objectScale; //オブジェクトの大きさ
+    json_model.scale.set( scale, scale, scale );
+    json_model.overdraw = true;
+    json_model.castShadow = true; //影を作るオブジェクト対象(castだけでは自身に影はつかない)
+    if (sp.objectShow) { scene.add( json_model ); }
+
+    //アニメーション
+    if (json_model.geometry.animations) {
+        THREE.AnimationHandler.add( json_model.geometry.animations[ 0 ] );
+        action = new THREE.Animation(json_model,
+                        json_model.geometry.animations[ 0 ].name,
+                        THREE.AnimationHandler.CATMULLROM);
+                        setTimeout(function() {
+                            if (sp.objectShow) { action.play(); }
+                            $audio = $("#audio");
+                            if (sp.objectShow) { $audio.get(0).play(); }
+                            animateCurrnetTime = 0;
+                            animate();
+                        }, 300);
+                        animation_length = json_model.geometry.animations[ 0 ].length;
+    }
+}
+
+
+var animateCurrnetTime = 0;
+function animate() {
+    requestAnimationFrame( animate );
+
+		// y軸回転のアニメーション
+	  pointCloud.rotation.y += xSpeed;
+
+	  var Count = particleCount;
+
+	  // パーティクルの落下の設定
+	  while(Count--){
+	    var particle = particles.vertices[ Count ];
+	    // スクリーン下に出たら戻る処理
+	    if(particle.y < -200) {
+	      particle.y = 200;
+	      particle.velocity.y = -Math.random();
+	    }
+	    particle.velocity.y -= Math.random()*ySpeed;
+	    particle.add(particle.velocity);
+	  }
+	  // 頂点変更処理
+	  pointCloud.geometry.__dirtyVertices = true;
+
+	var delta = clock.getDelta();
+	animateCurrnetTime += delta;
+	THREE.AnimationHandler.update(delta);
+    renderer.render( scene, camera );
+    control.update();   //これ追加
+    if (sp.objectShow) {
+	if (animateCurrnetTime >= animation_length) {
+		animateCurrnetTime = 0;
+		document.getElementById("audio").currentTime = 0;
+	}
+    }
+    stats.update();
+}
+
+function getUrlVars()
+{
+    var vars = [], hash;
+    var hashes = window.location.href.slice(window.location.href.indexOf('?') + 1).split('&');
+    for(var i = 0; i < hashes.length; i++) {
+        hash = hashes[i].split('=');
+        vars.push(hash[0]);
+        vars[hash[0]] = hash[1];
+    }
+    return vars;
+}
+
+function handleFileSelect(evt) {
+    evt.stopPropagation();
+    evt.preventDefault();
+
+    var file = evt.originalEvent.dataTransfer.files[0];
+    var reader = new FileReader();
+
+    if(!file.type.match('image.*')){
+        alert("画像ファイルではありません！");
+        return;
+    }
+
+    reader.onload = function(evt) {
+        sp.sphereData = evt.target.result;
+        var tex2 = new THREE.ImageUtils.loadTexture(evt.target.result);
+        mesh.material.map = tex2;
+    };
+
+    reader.readAsDataURL(file);
+}
+
+function handleDragOver(evt) {
+    evt.stopPropagation();
+    evt.preventDefault();
+}
+
+$(document).ready(function(){
+  $("#dd").on("dragover", handleDragOver).on("drop", handleFileSelect);
+});
+</script>
+<div id="dd">Drag & Drop Here!</div>
+<audio id="audio" src="gobas.m4a"></audio>
+</body>
+</html>

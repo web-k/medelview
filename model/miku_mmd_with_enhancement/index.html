@@ -1,0 +1,263 @@
+<html>
+<meta charset="utf-8">
+	<style>
+		html, body { height:100%; overflow:hidden; }
+		body { margin:0; }
+		#snapshot { position: absolute; top: 0px; left: 0px; }
+	</style>
+<body>
+<script src="jquery.min.js"></script>
+<script src="dat.gui.js"></script>
+<script src="three.min.js"></script>
+<script src="OrbitControls.js"></script>
+<script src="charsetencoder.min.js"></script>
+<script src="ammo.js"></script>
+<script src="TGALoader.js"></script>
+<script src="MMDLoader.js"></script>
+<script src="CCDIKSolver.js"></script>
+<script src="MMDPhysics.js"></script>
+<script>
+
+$(init);
+
+var SceneParams = function() {
+  // Camera
+  this.cameraFov = 60;
+  this.cameraX = 10;
+  this.cameraY = 0;
+  this.cameraZ = 15;
+  // Light
+  this.lightIntensity = 0.8;
+  this.lightX = 100;
+  this.lightY = 100;
+  this.lightZ = -100;
+  this.lightColor = "#00ace1";
+  this.lightCastShadow = false;
+  this.lightShadowDarkness = 0.1;
+  // Light2
+  this.light2Intensity = 0.8;
+  this.light2X = -100;
+  this.light2Y = 100;
+  this.light2Z = -100;
+  this.light2Color = "#00ace1";
+  this.light2CastShadow = false;
+  this.light2ShadowDarkness = 0.1;
+  // Light3
+  this.light3Intensity = 0.5;
+  this.light3X = 0;
+  this.light3Y = 10;
+  this.light3Z = 197;
+  this.light3Color = "#ffc969";
+  this.light3CastShadow = false;
+  this.light3ShadowDarkness = 0.2;
+  // AmbientLight
+  this.ambientLightColor = "#254048";
+  // Object
+  this.objectX = -0.25;
+  this.objectY = -18.0;
+  this.objectZ = 0.0;
+  this.objectScale = 5.7;
+  // Sphere
+  this.sphereRotation = 0;
+  // Operation
+  this.stop = function () {
+    action.stop();
+    animateCurrnetTime = 0;
+    $audio.get(0).pause();
+  };
+  this.start = function () {
+    action.stop();
+    animateCurrnetTime = 0;
+    $audio.get(0).load();
+    action.play();
+    $audio.get(0).play();
+  };
+};
+
+var ready = false;
+var helper;
+var ikSolver;
+var camZ = 0;
+var camZ_max = 1000;
+var camZ_min = 100;
+var segmentNumber = 60;
+function init() {
+	// 各種パラメータ変更GUI
+	var sp = new SceneParams();
+	var gui = new dat.GUI();
+	var cp = gui.addFolder('Camera');
+	cp.add(sp, 'cameraFov').min(0).max(180).onChange(function(value){ camera.fov = value; camera.updateProjectionMatrix(); });
+	cp.add(sp, 'cameraX').min(-300).max(300).step(0.5).onChange(function(value){ camera.position.x = value; });
+	cp.add(sp, 'cameraY').min(-300).max(300).step(0.5).onChange(function(value){ camera.position.y = value; });
+	cp.add(sp, 'cameraZ').min(-300).max(300).step(0.5).onChange(function(value){ camera.position.z = value; });
+	var l1p = gui.addFolder('Light1');
+	l1p.add(sp, 'lightIntensity').onChange(function(value){ light.intensity = value; });
+	l1p.add(sp, 'lightX').min(-300).max(300).step(0.5).onChange(function(value){ light.position.x = value; });
+	l1p.add(sp, 'lightY').min(-300).max(300).step(0.5).onChange(function(value){ light.position.y = value; });
+	l1p.add(sp, 'lightZ').min(-300).max(300).step(0.5).onChange(function(value){ light.position.z = value; });
+	l1p.addColor(sp, 'lightColor').onChange(function(value){
+            value=value.replace( '#','0x' );
+            light.color.setHex(value);
+        });
+	l1p.add(sp, 'lightCastShadow').onChange(function(value){ light.castShadow = value; });
+	l1p.add(sp, 'lightShadowDarkness').onChange(function(value){ light.shadowDarkness = value; });
+	var l2p = gui.addFolder('Light2');
+	l2p.add(sp, 'light2Intensity').onChange(function(value){ light2.intensity = value; });
+	l2p.add(sp, 'light2X').min(-300).max(300).step(0.5).onChange(function(value){ light2.position.x = value; });
+	l2p.add(sp, 'light2Y').min(-300).max(300).step(0.5).onChange(function(value){ light2.position.y = value; });
+	l2p.add(sp, 'light2Z').min(-300).max(300).step(0.5).onChange(function(value){ light2.position.z = value; });
+	l2p.addColor(sp, 'light2Color').onChange(function(value){
+            value=value.replace( '#','0x' );
+            light2.color.setHex(value);
+        });
+	l2p.add(sp, 'light2CastShadow').onChange(function(value){ light2.castShadow = value; });
+	l2p.add(sp, 'light2ShadowDarkness').onChange(function(value){ light2.shadowDarkness = value; });
+	var l3p = gui.addFolder('Light3');
+	l3p.add(sp, 'light3Intensity').onChange(function(value){ light3.intensity = value; });
+	l3p.add(sp, 'light3X').min(-300).max(300).step(0.5).onChange(function(value){ light3.position.x = value; });
+	l3p.add(sp, 'light3Y').min(-300).max(300).step(0.5).onChange(function(value){ light3.position.y = value; });
+	l3p.add(sp, 'light3Z').min(-300).max(300).step(0.5).onChange(function(value){ light3.position.z = value; });
+	l3p.addColor(sp, 'light3Color').onChange(function(value){
+            value=value.replace( '#','0x' );
+            light3.color.setHex(value);
+        });
+	l3p.add(sp, 'light3CastShadow').onChange(function(value){ light3.castShadow = value; });
+	l3p.add(sp, 'light3ShadowDarkness').onChange(function(value){ light3.shadowDarkness = value; });
+	var alp = gui.addFolder('AmbientLight');
+	alp.addColor(sp, 'ambientLightColor').onChange(function(value){
+            value=value.replace( '#','0x' );
+            ambientLight.color.setHex(value);
+        });
+        var ob = gui.addFolder('Object');
+	ob.add(sp, 'objectX').min(-300).max(300).onChange(function(value){ json.position.x = value; });
+	ob.add(sp, 'objectY').min(-300).max(300).onChange(function(value){ json.position.y = value; });
+	ob.add(sp, 'objectZ').min(-300).max(300).onChange(function(value){ json.position.z = value; });
+        var sph = gui.addFolder('Sphere');
+	sph.add(sp, 'sphereRotation').min(-180).max(180).onChange(function(value){
+            mesh.rotation.y += (value-lastSphereRotation) * Math.PI/180.0;
+            lastSphereRotation = value;
+        });
+
+    scene = new THREE.Scene();
+  
+    clock = new THREE.Clock();
+	var width = $(window).width();
+    var height = $(window).height();
+
+    // カメラ
+    camera = new THREE.PerspectiveCamera( sp.cameraFov, width / height);
+	camera.position.x = sp.cameraX;
+	camera.position.y = sp.cameraY;
+    camera.position.z = sp.cameraZ;
+    scene.add( camera );
+
+     
+    //ライティング
+    light = new THREE.DirectionalLight( eval(sp.lightColor.replace('#','0x')), sp.lightIntensity );
+    light.position.set(sp.lightX,sp.lightY,sp.lightZ);
+	light.castShadow = sp.lightCastShadow; //影を落とす光にする
+	light.shadowMapWidth = 2048; //影のマッピング細かさ
+	light.shadowMapHeight = 2048; //影のマッピング細かさ
+	light.shadowDarkness = sp.lightShadowDarkness; //影の濃さ
+    scene.add( light );
+    light2 = new THREE.DirectionalLight( eval(sp.light2Color.replace('#','0x')), sp.light2Intensity );
+    light2.position.set(sp.light2X,sp.light2Y,sp.light2Z);
+	light2.castShadow = sp.light2CastShadow; //影を落とす光にする
+	light2.shadowMapWidth = 2048; //影のマッピング細かさ
+	light2.shadowMapHeight = 2048; //影のマッピング細かさ
+	light2.shadowDarkness = sp.light2ShadowDarkness; //影の濃さ
+	scene.add( light2 );
+	light3 = new THREE.DirectionalLight( eval(sp.light3Color.replace('#','0x')), sp.light3Intensity );
+    light3.position.set(sp.light3X,sp.light3Y,sp.light3Z);
+	light3.castShadow = sp.light3CastShadow; //影を落とす光にする
+	light3.shadowMapWidth = 2048; //影のマッピング細かさ
+	light3.shadowMapHeight = 2048; //影のマッピング細かさ
+	light3.shadowDarkness = sp.light3ShadowDarkness; //影の濃さ
+    scene.add( light3 );
+	ambientLight = new THREE.AmbientLight( eval(sp.ambientLightColor.replace('#','0x')) );
+    scene.add(ambientLight); //環境光
+     
+    //レンダラー
+    renderer = new THREE.WebGLRenderer();//THREE.CanvasRenderer();でもいいけどポリゴンの裏が非表示？
+
+    //オブジェクト
+    helper = new THREE.MMDHelper( renderer );
+    loader = new THREE.MMDLoader();
+    loader.load( 'miku.pmd', ['wavefile_v2.vmd'], function ( object ) {
+	json = object;
+        helper.add( json );
+        helper.setAnimation( json );
+        helper.setPhysics( json );
+        var audioParams = { delayTime: 0 };
+        loader.loadAudio( 'wavefile_v2.m4a', function ( audio, listener ) {
+
+		listener.position.z = 1;
+
+		helper.setAudio( audio, listener, audioParams );
+
+		/*
+		 * Note: call this method after you set all animations
+		 *       including camera and audio.
+		 */
+		helper.unifyAnimationDuration();
+
+		scene.add( audio );
+		scene.add( listener );
+		scene.add( json );
+
+		ready = true;
+                animate();
+
+	}, function(xhr) {}, function(xhr) {} );
+ 
+        json.position.set( sp.objectX, sp.objectY, sp.objectZ); //オブジェクトの位置
+		json.overdraw = true;
+         	json.castShadow = false; //影を作るオブジェクト対象(castだけでは自身に影はつかない) MMDLoaderはshadowをまだサポートしていない
+		
+    });
+
+	//背景
+    loader2 = new THREE.ImageLoader();
+    loader2.load( 'equirectangular.jpg', function (image) {
+      tex = new THREE.ImageUtils.loadTexture(image.src);
+	  tex.minFilter = tex.magFilter = THREE.LinearFilter;
+      //モデルを考慮して空間半径を決めないといけない→モデル側を変えるといい。
+      sphereGeometry = new THREE.SphereGeometry( 19, segmentNumber, segmentNumber); // MMDLoader側のスケールが今のところ変えられない
+      var matrix = new THREE.Matrix4().makeScale(1, 1, -1);
+      sphereGeometry.applyMatrix(matrix);
+      lastSphereRotation = sp.sphereRotation;
+      var sphereRotationY = new THREE.Matrix4().makeRotationY((90+sp.sphereRotation) * Math.PI/180.0);
+      sphereGeometry.applyMatrix(sphereRotationY);
+      mesh = new THREE.Mesh(sphereGeometry , new THREE.MeshBasicMaterial( { map: tex, overdraw: true} ) );
+	  mesh.receiveShadow = true; //影を受けるオブジェクト対象(receiveだけでは自身は影を作らない)
+      scene.add( mesh );
+    });
+
+    //レンダラー
+    renderer.setSize( width, height );
+	renderer.shadowMapEnabled = true;
+    document.body.appendChild( renderer.domElement );
+  
+    //マウスコントローラ
+    control = new THREE.OrbitControls( camera, renderer.domElement ); // 表示領域をコントロール
+    control.noPan = true; // 右ドラッグ(平行視点移動禁止)
+}
+
+var animateCurrnetTime = 0;
+function animate() {
+    requestAnimationFrame( animate );
+    if (ready) {
+	var delta = clock.getDelta();
+	animateCurrnetTime += delta;
+        helper.animate( delta );
+        helper.render( scene, camera );
+    } else {
+        renderer.clear();
+        renderer.render( scene, camera );
+    }
+    control.update();   //これ追加
+}
+</script>
+
+</body>
+</html>
