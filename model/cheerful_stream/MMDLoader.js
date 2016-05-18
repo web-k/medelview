@@ -2393,7 +2393,7 @@ THREE.MMDLoader.prototype.createMesh = function ( model, texturePath, onProgress
 
 				};
 
-				m.uniforms.outlineThickness.value = p2.edgeFlag === 1 ? 0.003 : 0.0;
+				m.uniforms.outlineThickness.value = p2.edgeFlag === 1 ? 0.0 : 0.0;
 				m.uniforms.outlineColor.value = new THREE.Color( 0.0, 0.0, 0.0 );
 				m.uniforms.outlineAlpha.value = 1.0;
 				m.uniforms.toonMap.value = textures[ p2.toonIndex ];
