@@ -23,6 +23,7 @@ $(init);
 
 var SceneParams = function() {
   // Camera
+  // teramemo camera must move
   this.cameraFov = 60;
   this.cameraX = 9;
   this.cameraY = 0;
@@ -60,12 +61,10 @@ var SceneParams = function() {
   // Operation
   this.stop = function () {
     action.stop();
-    animateCurrnetTime = 0;
     $audio.get(0).pause();
   };
   this.start = function () {
     action.stop();
-    animateCurrnetTime = 0;
     $audio.get(0).load();
     action.play();
     $audio.get(0).play();
@@ -214,7 +213,7 @@ function init() {
 
                 scene.add( audio );
                 scene.add( listener );
-		scene.add( json );
+//		scene.add( json );
 
 		ready = true;
                 animate();
@@ -241,6 +240,86 @@ function init() {
     control = new THREE.OrbitControls( camera, renderer.domElement ); // 表示領域をコントロール
     control.noPan = true; // 右ドラッグ(平行視点移動禁止)
 
+    //key bind
+    keyEventOn();
+
+}
+var moving_interval = 100/30;
+var ctrl;
+function keyEventOn() {
+  var $window = $(window);
+  var press_key = null;
+  var visible_miku = false;
+  var element = control.domElement === document ? control.domElement.body : control.domElement;
+
+  $window.keydown(function(e) {
+    if (press_key == e.keyCode) {
+      e.preventDefault();
+      e.stopPropagation();
+      return;
+    }
+    clearInterval(ctrl);
+    var rotateDelta = 1.01;
+    switch (e.keyCode) {
+      case 13: // Enter
+        press_key = e.keyCode;
+        if (visible_miku) {
+          scene.remove(json);
+          visible_miku = false;
+        } else {
+          visible_miku = true;
+          json.mixer.clipAction(json.geometry.animations[0]).time = 0;
+          scene.add(json);
+        }
+        break;
+      case 33: // Page Up
+        press_key = e.keyCode;
+        // zoom in
+        break;
+      case 34: // Page Down
+        press_key = e.keyCode;
+        // zoom out
+        break;
+      case 37: // Left
+        press_key = e.keyCode;
+        // look left
+        ctrl = setInterval(function(){if(rotateDelta<3.0)rotateDelta*=rotateDelta; control.rotateLeft( 2 * Math.PI * rotateDelta / element.clientWidth * control.rotateSpeed );},moving_interval);
+        break;
+      case 38: // Up
+        press_key = e.keyCode;
+        // look up
+        ctrl = setInterval(function(){control.rotateUp( 2 * Math.PI * rotateDelta / element.clientHeight * control.rotateSpeed );},moving_interval);
+        break;
+      case 39: // Right
+        press_key = e.keyCode;
+        // look right
+        ctrl = setInterval(function(){if(rotateDelta<3.0)rotateDelta*=rotateDelta; control.rotateLeft( (-2) * Math.PI * rotateDelta / element.clientWidth * control.rotateSpeed );},moving_interval);
+        break;
+      case 40: // Down
+        press_key = e.keyCode;
+        // look down
+        ctrl = setInterval(function(){control.rotateUp( (-2) * Math.PI * rotateDelta / element.clientHeight * control.rotateSpeed );},moving_interval);
+        break;
+    }
+    if (press_key) {
+      e.preventDefault();
+      e.stopPropagation();
+    }
+  });
+  $window.keyup(function(e) {
+    switch (e.keyCode) {
+      case 13: // Enter
+      case 33: // Page Up
+      case 34: // Page Down
+      case 37: // Left
+      case 38: // Up
+      case 39: // Right
+      case 40: // Down
+        press_key = null;
+        clearInterval(ctrl);
+        break;
+    }
+  });
 }
 
 
