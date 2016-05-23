@@ -25,9 +25,9 @@ var SceneParams = function() {
   // Camera
   // teramemo camera must move
   this.cameraFov = 60;
-  this.cameraX = 9;
+  this.cameraX = -15;
   this.cameraY = 0;
-  this.cameraZ = 14;
+  this.cameraZ = 18;
   // Light
   this.lightIntensity = 0;
   this.lightX = 100;
@@ -251,6 +251,8 @@ function keyEventOn() {
   var press_key = null;
   var visible_miku = false;
   var element = control.domElement === document ? control.domElement.body : control.domElement;
+  var rotateDelta = 1.01;
+  var rotateDeltaMax = 3.0;
 
   $window.keydown(function(e) {
     if (press_key == e.keyCode) {
@@ -259,7 +261,7 @@ function keyEventOn() {
       return;
     }
     clearInterval(ctrl);
-    var rotateDelta = 1.01;
+    rotateDelta = 1.01;
     switch (e.keyCode) {
       case 13: // Enter
         press_key = e.keyCode;
@@ -283,7 +285,7 @@ function keyEventOn() {
       case 37: // Left
         press_key = e.keyCode;
         // look left
-        ctrl = setInterval(function(){if(rotateDelta<3.0)rotateDelta*=rotateDelta; control.rotateLeft( 2 * Math.PI * rotateDelta / element.clientWidth * control.rotateSpeed );},moving_interval);
+        ctrl = setInterval(function(){if(rotateDelta<rotateDeltaMax)rotateDelta*=rotateDelta; control.rotateLeft( 2 * Math.PI * rotateDelta / element.clientWidth * control.rotateSpeed );},moving_interval);
         break;
       case 38: // Up
         press_key = e.keyCode;
@@ -293,7 +295,7 @@ function keyEventOn() {
       case 39: // Right
         press_key = e.keyCode;
         // look right
-        ctrl = setInterval(function(){if(rotateDelta<3.0)rotateDelta*=rotateDelta; control.rotateLeft( (-2) * Math.PI * rotateDelta / element.clientWidth * control.rotateSpeed );},moving_interval);
+        ctrl = setInterval(function(){if(rotateDelta<rotateDeltaMax)rotateDelta*=rotateDelta; control.rotateLeft( (-2) * Math.PI * rotateDelta / element.clientWidth * control.rotateSpeed );},moving_interval);
         break;
       case 40: // Down
         press_key = e.keyCode;
