@@ -25,7 +25,7 @@ var SceneParams = function() {
   // Camera
   this.cameraFov = 60;
   this.cameraX = 9;
-  this.cameraY = 0;
+  this.cameraY = 9;
   this.cameraZ = 14;
   // Light
   this.lightIntensity = 0;
@@ -54,10 +54,10 @@ var SceneParams = function() {
   // AmbientLight
   this.ambientLightColor = "#cccccc";
   // Object
-  this.objectX = -0.25;
+  this.objectX = -2;
   this.objectY = -16.0;
   this.objectZ = 0.0;
-  this.objectScale = 5.7;
+  this.objectScale = 1;
   // Sphere
   this.sphereRotation = 0;
   // Operation
@@ -165,9 +165,11 @@ function init() {
     //オブジェクト
     helper = new THREE.MMDHelper( renderer );
     loader = new THREE.MMDLoader();
-    loader.load( 'models/tune.pmx', ['muni.vmd'], function ( object ) {
+    loader.load( 'models/tune.pmx', ['niko.vmd'], function ( object ) {
 	json = object;
+        json.rotation.y = 110*Math.PI/180;
         json.position.set( sp.objectX, sp.objectY, sp.objectZ); //オブジェクトの位置
+        json.scale.set( sp.objectScale, sp.objectScale, sp.objectScale );
                 json.overdraw = true;
                 json.castShadow = false; //影を作るオブジェクト対象(castだけでは自身に影はつかない) MMDLoaderはshadowをまだサポートしていない
         helper.add( json );
@@ -203,27 +205,12 @@ function init() {
 	  mesh.receiveShadow = true; //影を受けるオブジェクト対象(receiveだけでは自身は影を作らない)
       scene.add( mesh );
 
-        var audioParams = { delayTime: 0 };
-        loader.loadAudio( 'muni.m4a', function ( audio, listener ) {
-
-                listener.position.z = 1;
-
-                helper.setAudio( audio, listener, audioParams );
-
-                /*
-                 * Note: call this method after you set all animations
-                 *       including camera and audio.
-                 */
                 helper.unifyAnimationDuration();
 
-                scene.add( audio );
-                scene.add( listener );
 		scene.add( json );
 
 		ready = true;
                 animate();
-
-        }, function(xhr) {}, function(xhr) {} );
 
     }, function(error) {
           console.log("The following error occured: " + error);
