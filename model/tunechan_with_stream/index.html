@@ -1,0 +1,285 @@
+<html>
+<meta charset="utf-8">
+	<style>
+		html, body { height:100%; overflow:hidden; }
+		body { margin:0; }
+		#snapshot { position: absolute; top: 0px; left: 0px; }
+	</style>
+<body>
+<script src="jquery.min.js"></script>
+<script src="dat.gui.js"></script>
+<script src="three.min.js"></script>
+<script src="OrbitControls.js"></script>
+<script src="charsetencoder.min.js"></script>
+<script src="ammo.js"></script>
+<script src="TGALoader.js"></script>
+<script src="MMDLoader.js"></script>
+<script src="CCDIKSolver.js"></script>
+<script src="MMDPhysics.js"></script>
+<script src="Stats.js"></script>
+<script>
+
+$(init);
+
+var SceneParams = function() {
+  // Camera
+  this.cameraFov = 60;
+  this.cameraX = 9;
+  this.cameraY = 9;
+  this.cameraZ = 14;
+  // Light
+  this.lightIntensity = 0;
+  this.lightX = 100;
+  this.lightY = 100;
+  this.lightZ = -100;
+  this.lightColor = "#ffffff";
+  this.lightCastShadow = false;
+  this.lightShadowDarkness = 0.1;
+  // Light2
+  this.light2Intensity = 0.2;
+  this.light2X = -100;
+  this.light2Y = 100;
+  this.light2Z = -100;
+  this.light2Color = "#ffffff";
+  this.light2CastShadow = false;
+  this.light2ShadowDarkness = 0.1;
+  // Light3
+  this.light3Intensity = 0;
+  this.light3X = -5;
+  this.light3Y = 150;
+  this.light3Z = 200;
+  this.light3Color = "#ffffff";
+  this.light3CastShadow = true;
+  this.light3ShadowDarkness = 0.4;
+  // AmbientLight
+  this.ambientLightColor = "#cccccc";
+  // Object
+  this.objectX = -2;
+  this.objectY = -16.0;
+  this.objectZ = 0.0;
+  this.objectScale = 1;
+  // Sphere
+  this.sphereRotation = 0;
+  // Operation
+  this.stop = function () {
+    action.stop();
+    animateCurrnetTime = 0;
+    $audio.get(0).pause();
+  };
+  this.start = function () {
+    action.stop();
+    animateCurrnetTime = 0;
+    $audio.get(0).load();
+    action.play();
+    $audio.get(0).play();
+  };
+};
+
+var ready = false;
+var helper;
+var ikSolver;
+var camZ = 0;
+var camZ_max = 1000;
+var camZ_min = 100;
+var segmentNumber = 60;
+var camera_size = null;
+var uvc_blender = false;
+var show_stats = false;
+var canvas_size = null;
+function init() {
+    // クエリチェック
+   var url_vars =  getUrlVars();
+   if (url_vars["cm"]) {
+     camera_size = parseInt(url_vars["cm"]);
+   }
+   if ("ub" in url_vars) {
+     uvc_blender = true;
+   }
+   if ("st" in url_vars) {
+     show_stats = true;
+   }
+   if (url_vars["cv"]) {
+     canvas_size = parseInt(url_vars["cv"]);
+   }
+
+	var sp = new SceneParams();
+
+                // FPS表示
+                stats = new Stats();
+                var $stats = $(stats.domElement);
+                stats.setMode( 0 ); //fps
+                // align top-left
+                $stats.css({
+                        position: "absolute",
+                        left: "80px",
+                        top: 0
+                        });
+
+                if (show_stats) {
+                    $("body").append($stats);
+                }
+
+
+    scene = new THREE.Scene();
+  
+    clock = new THREE.Clock();
+	var width = $(window).width();
+    var height = $(window).height();
+
+    // カメラ
+    camera = new THREE.PerspectiveCamera( sp.cameraFov, width / height);
+	camera.position.x = sp.cameraX;
+	camera.position.y = sp.cameraY;
+    camera.position.z = sp.cameraZ;
+    scene.add( camera );
+
+     
+    //ライティング
+    light = new THREE.DirectionalLight( eval(sp.lightColor.replace('#','0x')), sp.lightIntensity );
+    light.position.set(sp.lightX,sp.lightY,sp.lightZ);
+	light.castShadow = sp.lightCastShadow; //影を落とす光にする
+	light.shadow.mapSize.width = 2048; //影のマッピング細かさ
+	light.shadow.mapSize.height = 2048; //影のマッピング細かさ
+	//light.shadowDarkness = sp.lightShadowDarkness; //影の濃さ
+    scene.add( light );
+    light2 = new THREE.DirectionalLight( eval(sp.light2Color.replace('#','0x')), sp.light2Intensity );
+    light2.position.set(sp.light2X,sp.light2Y,sp.light2Z);
+	light2.castShadow = sp.light2CastShadow; //影を落とす光にする
+	light2.shadow.mapSize.width = 2048; //影のマッピング細かさ
+	light2.shadow.mapSize.height = 2048; //影のマッピング細かさ
+	//light2.shadowDarkness = sp.light2ShadowDarkness; //影の濃さ
+	scene.add( light2 );
+	light3 = new THREE.DirectionalLight( eval(sp.light3Color.replace('#','0x')), sp.light3Intensity );
+    light3.position.set(sp.light3X,sp.light3Y,sp.light3Z);
+	light3.castShadow = sp.light3CastShadow; //影を落とす光にする
+	light3.shadow.mapSize.width = 2048; //影のマッピング細かさ
+	light3.shadow.mapSize.height = 2048; //影のマッピング細かさ
+	//light3.shadowDarkness = sp.light3ShadowDarkness; //影の濃さ
+    scene.add( light3 );
+	ambientLight = new THREE.AmbientLight( eval(sp.ambientLightColor.replace('#','0x')) );
+    scene.add(ambientLight); //環境光
+     
+    //レンダラー
+    renderer = new THREE.WebGLRenderer();//THREE.CanvasRenderer();でもいいけどポリゴンの裏が非表示？
+
+    //オブジェクト
+    helper = new THREE.MMDHelper( renderer );
+    loader = new THREE.MMDLoader();
+    loader.load( 'models/tune.pmx', ['niko.vmd'], function ( object ) {
+	json = object;
+        json.rotation.y = 110*Math.PI/180;
+        json.position.set( sp.objectX, sp.objectY, sp.objectZ); //オブジェクトの位置
+        json.scale.set( sp.objectScale, sp.objectScale, sp.objectScale );
+                json.overdraw = true;
+                json.castShadow = false; //影を作るオブジェクト対象(castだけでは自身に影はつかない) MMDLoaderはshadowをまだサポートしていない
+        helper.add( json );
+        helper.setAnimation( json );
+        helper.setPhysics( json );
+
+
+	//背景
+  navigator.getMedia = ( navigator.getUserMedia ||
+                       navigator.webkitGetUserMedia ||
+                       navigator.mozGetUserMedia ||
+                       navigator.msGetUserMedia);
+  var is_ff = navigator.mozGetUserMedia;
+  video = document.createElement('video');
+  var camera_height = camera_size || 1080;
+  var camera_width = uvc_blender ? camera_height*2 : (camera_size || 1080) * 1920 / 1080;
+  navigator.getMedia( {"video": is_ff ? { height: { ideal: camera_height } } : {mandatory: { minWidth: camera_width, maxWidth: camera_width, minHeight: camera_height, maxHeight: camera_height }}, "audio":true}, function(stream){
+          video.src = URL.createObjectURL(stream);
+          window.localStream = stream;
+          video.play();
+          videoImage = document.createElement('canvas');
+          videoImageContext = videoImage.getContext('2d');
+          videoImageContext.fillStyle = '#000000';
+          tex = new THREE.Texture(videoImage);
+	  tex.minFilter = tex.magFilter = THREE.LinearFilter;
+      sphereGeometry = new THREE.SphereGeometry( 16, segmentNumber, segmentNumber); // MMDLoader側のスケールが今のところ変えられない
+      var matrix = new THREE.Matrix4().makeScale(1, 1, -1);
+      sphereGeometry.applyMatrix(matrix);
+      lastSphereRotation = sp.sphereRotation;
+      var sphereRotationY = new THREE.Matrix4().makeRotationY((90+sp.sphereRotation) * Math.PI/180.0);
+      sphereGeometry.applyMatrix(sphereRotationY);
+      mesh = new THREE.Mesh(sphereGeometry , new THREE.MeshBasicMaterial( { map: tex, overdraw: true} ) );
+	  mesh.receiveShadow = true; //影を受けるオブジェクト対象(receiveだけでは自身は影を作らない)
+      scene.add( mesh );
+
+                helper.unifyAnimationDuration();
+
+		scene.add( json );
+
+		ready = true;
+                animate();
+
+    }, function(error) {
+          console.log("The following error occured: " + error);
+    });
+
+    });
+
+    //レンダラー
+    var aspect = width/height;
+    var renderer_height = canvas_size || height;
+    renderer.setSize( renderer_height*aspect, renderer_height );
+    var renderer_element = renderer.domElement;
+    renderer_element.style.width = width + "px";
+    renderer_element.style.height = height + "px";
+    renderer.shadowMap.enabled = true;
+    document.body.appendChild( renderer.domElement );
+  
+    //マウスコントローラ
+    control = new THREE.OrbitControls( camera, renderer.domElement ); // 表示領域をコントロール
+    control.noPan = true; // 右ドラッグ(平行視点移動禁止)
+
+}
+
+
+var isAudioInitialized = false;
+var isVideoInitialized = false;
+function animate() {
+    requestAnimationFrame( animate );
+    if (ready) {
+	var delta = clock.getDelta();
+        helper.animate(delta);
+        helper.render( scene, camera );
+    } else {
+        renderer.clear();
+        renderer.render( scene, camera );
+    }
+       if (video.readyState === video.HAVE_ENOUGH_DATA)  {
+        video.play();
+          if (!isVideoInitialized) {
+            var width = video.videoWidth;
+            var height = video.videoHeight;
+            console.log("video-width: " + width + ", video-height: " + height);
+            var equi_height = width/2 - 2;
+            videoImage.width = width;
+            videoImage.height = uvc_blender ? height : equi_height;
+            videoImageContext = videoImage.getContext('2d');
+            videoImageContext.fillRect(0, 0, width, height);
+            isVideoInitialized = true;
+          }
+        videoImageContext.drawImage(video, 0, 0);
+        tex.needsUpdate = true;
+      }
+
+    control.update();   //これ追加
+    stats.update();
+}
+
+function getUrlVars()
+{
+    var vars = [], hash;
+    var hashes = window.location.href.slice(window.location.href.indexOf('?') + 1).split('&');
+    for(var i = 0; i < hashes.length; i++) {
+        hash = hashes[i].split('=');
+        vars.push(hash[0]);
+        vars[hash[0]] = hash[1];
+    }
+    return vars;
+}
+</script>
+
+</body>
+</html>
