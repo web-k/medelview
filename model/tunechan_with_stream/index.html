@@ -191,6 +191,8 @@ function init() {
           window.localStream = stream;
           video.play();
           videoImage = document.createElement('canvas');
+          videoImage.width = camera_width;
+          videoImage.height = camera_height;
           videoImageContext = videoImage.getContext('2d');
           videoImageContext.fillStyle = '#000000';
           tex = new THREE.Texture(videoImage);
@@ -235,8 +237,6 @@ function init() {
 }
 
 
-var isAudioInitialized = false;
-var isVideoInitialized = false;
 function animate() {
     requestAnimationFrame( animate );
     if (ready) {
@@ -249,17 +249,6 @@ function animate() {
     }
        if (video.readyState === video.HAVE_ENOUGH_DATA)  {
         video.play();
-          if (!isVideoInitialized) {
-            var width = video.videoWidth;
-            var height = video.videoHeight;
-            console.log("video-width: " + width + ", video-height: " + height);
-            var equi_height = width/2 - 2;
-            videoImage.width = width;
-            videoImage.height = uvc_blender ? height : equi_height;
-            videoImageContext = videoImage.getContext('2d');
-            videoImageContext.fillRect(0, 0, width, height);
-            isVideoInitialized = true;
-          }
         videoImageContext.drawImage(video, 0, 0);
         tex.needsUpdate = true;
       }
