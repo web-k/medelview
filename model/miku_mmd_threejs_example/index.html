@@ -6,19 +6,17 @@
 		#snapshot { position: absolute; top: 0px; left: 0px; }
 	</style>
 <body>
-<script src="jquery.min.js"></script>
-<script src="dat.gui.js"></script>
-<script src="three.min.js"></script>
-<script src="OrbitControls.js"></script>
-<script src="charsetencoder.min.js"></script>
+<script src="../javascripts/three.js/r111/dat.gui.min.js"></script>
+<script src="../javascripts/three.js/r111/three.min.js"></script>
+<script src="../javascripts/three.js/r111/OrbitControls.js"></script>
+<!-- FIXME: ammo.jsのみr111の物を使うとMMDPhosics.jsでTypeErrorになるので古いバージョンを使用 -->
 <script src="ammo.js"></script>
-<script src="TGALoader.js"></script>
-<script src="MMDLoader.js"></script>
-<script src="CCDIKSolver.js"></script>
-<script src="MMDPhysics.js"></script>
+<script src="../javascripts/mmd-parser/master/mmdparser.min.js"></script>
+<script src="../javascripts/three.js/r111/MMDLoader.js"></script>
+<script src="../javascripts/three.js/r111/CCDIKSolver.js"></script>
+<script src="../javascripts/three.js/r111/MMDPhysics.js"></script>
+<script src="../javascripts/three.js/r111/MMDAnimationHelper.js"></script>
 <script>
-
-$(init);
 
 var SceneParams = function() {
   // Camera
@@ -33,7 +31,6 @@ var SceneParams = function() {
   this.lightZ = -100;
   this.lightColor = "#00ace1";
   this.lightCastShadow = false;
-  this.lightShadowDarkness = 0;
   // Light2
   this.light2Intensity = 0;
   this.light2X = -100;
@@ -41,7 +38,6 @@ var SceneParams = function() {
   this.light2Z = -100;
   this.light2Color = "#00ace1";
   this.light2CastShadow = false;
-  this.light2ShadowDarkness = 0;
   // Light3
   this.light3Intensity = 0.25;
   this.light3X = 0;
@@ -49,7 +45,6 @@ var SceneParams = function() {
   this.light3Z = 197;
   this.light3Color = "#ffc969";
   this.light3CastShadow = false;
-  this.light3ShadowDarkness = 0;
   // AmbientLight
   this.ambientLightColor = "#bbfaff";
   // Object
@@ -59,24 +54,10 @@ var SceneParams = function() {
   this.objectScale = 5.7;
   // Sphere
   this.sphereRotation = 0;
-  // Operation
-  this.stop = function () {
-    action.stop();
-    animateCurrnetTime = 0;
-    $audio.get(0).pause();
-  };
-  this.start = function () {
-    action.stop();
-    animateCurrnetTime = 0;
-    $audio.get(0).load();
-    action.play();
-    $audio.get(0).play();
-  };
 };
 
 var ready = false;
 var helper;
-var ikSolver;
 var camZ = 0;
 var camZ_max = 1000;
 var camZ_min = 100;
@@ -100,7 +81,6 @@ function init() {
             light.color.setHex(value);
         });
 	l1p.add(sp, 'lightCastShadow').onChange(function(value){ light.castShadow = value; });
-	l1p.add(sp, 'lightShadowDarkness').onChange(function(value){ light.shadowDarkness = value; });
 	var l2p = gui.addFolder('Light2');
 	l2p.add(sp, 'light2Intensity').onChange(function(value){ light2.intensity = value; });
 	l2p.add(sp, 'light2X').min(-300).max(300).step(0.5).onChange(function(value){ light2.position.x = value; });
@@ -111,7 +91,6 @@ function init() {
             light2.color.setHex(value);
         });
 	l2p.add(sp, 'light2CastShadow').onChange(function(value){ light2.castShadow = value; });
-	l2p.add(sp, 'light2ShadowDarkness').onChange(function(value){ light2.shadowDarkness = value; });
 	var l3p = gui.addFolder('Light3');
 	l3p.add(sp, 'light3Intensity').onChange(function(value){ light3.intensity = value; });
 	l3p.add(sp, 'light3X').min(-300).max(300).step(0.5).onChange(function(value){ light3.position.x = value; });
@@ -122,7 +101,6 @@ function init() {
             light3.color.setHex(value);
         });
 	l3p.add(sp, 'light3CastShadow').onChange(function(value){ light3.castShadow = value; });
-	l3p.add(sp, 'light3ShadowDarkness').onChange(function(value){ light3.shadowDarkness = value; });
 	var alp = gui.addFolder('AmbientLight');
 	alp.addColor(sp, 'ambientLightColor').onChange(function(value){
             value=value.replace( '#','0x' );
@@ -141,8 +119,8 @@ function init() {
     scene = new THREE.Scene();
 
     clock = new THREE.Clock();
-	var width = $(window).width();
-    var height = $(window).height();
+	var width = window.innerWidth;
+    var height = window.innerHeight;
 
     // カメラ
     camera = new THREE.PerspectiveCamera( sp.cameraFov, width / height);
@@ -156,23 +134,20 @@ function init() {
     light = new THREE.DirectionalLight( eval(sp.lightColor.replace('#','0x')), sp.lightIntensity );
     light.position.set(sp.lightX,sp.lightY,sp.lightZ);
 	light.castShadow = sp.lightCastShadow; //影を落とす光にする
-	light.shadowMapWidth = 2048; //影のマッピング細かさ
-	light.shadowMapHeight = 2048; //影のマッピング細かさ
-	light.shadowDarkness = sp.lightShadowDarkness; //影の濃さ
+	light.shadow.mapSize.width = 2048; //影のマッピング細かさ
+	light.shadow.mapSize.height = 2048; //影のマッピング細かさ
     scene.add( light );
     light2 = new THREE.DirectionalLight( eval(sp.light2Color.replace('#','0x')), sp.light2Intensity );
     light2.position.set(sp.light2X,sp.light2Y,sp.light2Z);
 	light2.castShadow = sp.light2CastShadow; //影を落とす光にする
-	light2.shadowMapWidth = 2048; //影のマッピング細かさ
-	light2.shadowMapHeight = 2048; //影のマッピング細かさ
-	light2.shadowDarkness = sp.light2ShadowDarkness; //影の濃さ
+	light2.shadow.mapSize.width = 2048; //影のマッピング細かさ
+	light2.shadow.mapSize.height = 2048; //影のマッピング細かさ
 	scene.add( light2 );
 	light3 = new THREE.DirectionalLight( eval(sp.light3Color.replace('#','0x')), sp.light3Intensity );
     light3.position.set(sp.light3X,sp.light3Y,sp.light3Z);
 	light3.castShadow = sp.light3CastShadow; //影を落とす光にする
-	light3.shadowMapWidth = 2048; //影のマッピング細かさ
-	light3.shadowMapHeight = 2048; //影のマッピング細かさ
-	light3.shadowDarkness = sp.light3ShadowDarkness; //影の濃さ
+	light3.shadow.mapSize.width = 2048; //影のマッピング細かさ
+	light3.shadow.mapSize.height = 2048; //影のマッピング細かさ
     scene.add( light3 );
 	ambientLight = new THREE.AmbientLight( eval(sp.ambientLightColor.replace('#','0x')) );
     scene.add(ambientLight); //環境光
@@ -181,38 +156,33 @@ function init() {
     renderer = new THREE.WebGLRenderer();//THREE.CanvasRenderer();でもいいけどポリゴンの裏が非表示？
 
     //オブジェクト
-    helper = new THREE.MMDHelper( renderer );
+    helper = new THREE.MMDAnimationHelper();
     loader = new THREE.MMDLoader();
-    loader.load( 'models/lat/miku.pmd', ['wavefile_v2.vmd'], function ( object ) {
-	json = object;
-        helper.add( json );
-        helper.setAnimation( json );
-        helper.setPhysics( json );
-        var audioParams = { delayTime: 0 };
-        loader.loadAudio( 'wavefile_v2.m4a', function ( audio, listener ) {
+    loader.loadWithAnimation( 'models/lat/miku.pmd', 'wavefile_v2.vmd', function ( mmd ) {
+        helper.add( mmd.mesh, {
+            animation: mmd.animation,
+            physics: true
+        } );
 
-		listener.position.z = 1;
+        scene.add( mmd.mesh );
 
-		helper.setAudio( audio, listener, audioParams );
+        new THREE.AudioLoader().load( 'wavefile_short.mp3', function ( buffer ) {
+            listener = new THREE.AudioListener();
+            audio = new THREE.Audio(listener).setBuffer(buffer);
 
-		/*
-		 * Note: call this method after you set all animations
-		 *       including camera and audio.
-		 */
-		helper.unifyAnimationDuration();
+            listener.position.z = 1;
 
-		scene.add( audio );
-		scene.add( listener );
-		scene.add( json );
+            helper.add( audio, { delayTime: 160 * 1 / 30 } );
 
-		ready = true;
-                animate();
+            scene.add( audio );
+            scene.add( listener );
 
-	}, function(xhr) {}, function(xhr) {} );
+            ready = true;
+            animate();
+        });
 
-        json.position.set( sp.objectX, sp.objectY, sp.objectZ); //オブジェクトの位置
-		json.overdraw = true;
-         	json.castShadow = false; //影を作るオブジェクト対象(castだけでは自身に影はつかない) MMDLoaderはshadowをまだサポートしていない
+        mmd.mesh.position.set( sp.objectX, sp.objectY, sp.objectZ); //オブジェクトの位置
+        mmd.mesh.castShadow = false; //影を作るオブジェクト対象(castだけでは自身に影はつかない) MMDLoaderはshadowをまだサポートしていない
 
     });
 
@@ -229,7 +199,7 @@ function init() {
         lastSphereRotation = sp.sphereRotation;
         var sphereRotationY = new THREE.Matrix4().makeRotationY((90+sp.sphereRotation) * Math.PI/180.0);
         sphereGeometry.applyMatrix(sphereRotationY);
-        mesh = new THREE.Mesh(sphereGeometry , new THREE.MeshBasicMaterial( { map: tex, overdraw: true} ) );
+        mesh = new THREE.Mesh(sphereGeometry , new THREE.MeshBasicMaterial( { map: tex } ) );
 	    mesh.receiveShadow = false; //影を受けるオブジェクト対象(receiveだけでは自身は影を作らない)
         scene.add( mesh );
 	  });
@@ -249,16 +219,16 @@ var animateCurrnetTime = 0;
 function animate() {
     requestAnimationFrame( animate );
     if (ready) {
-	var delta = clock.getDelta();
-	animateCurrnetTime += delta;
-        helper.animate( delta );
-        helper.render( scene, camera );
+        var delta = clock.getDelta();
+        animateCurrnetTime += delta;
+        helper.update( delta );
     } else {
         renderer.clear();
-        renderer.render( scene, camera );
     }
+    renderer.render( scene, camera );
     control.update();   //これ追加
 }
+init();
 </script>
 
 </body>
